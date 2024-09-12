@@ -1,5 +1,6 @@
                         #### Temporal Sequencing of Documents ####
 
+Data Source: https://cran.r-project.org/web/packages/sotu/sotu.pdf
 
                                         #R SOURCE CODE 
 
