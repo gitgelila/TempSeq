@@ -1,0 +1,335 @@
+                         #### Temporal Sequencing of Documents ####
+
+
+                                    #PSEUDOCODE CODE
+
+#IN THIS PROGRAM, WE SELECT 100 RANDOM SAMPLES WHERE EACH SAMPLE CONSISTS OF A SEQUENCE OF
+#TEN ADDRESSES FROM STATE OF THE UNION ADDRESS (SOTU). THE DATES OF THE ADDRESSES ARE IN A
+#CONSECUTIVE SEQUENTIAL ORDER 23 YEARS APART, RANGING FROM 1790 TO 2020. THERE ARE A TOTAL OF 240 ADDRESSES.
+#WE RANDOMLY PERMUTE THE TEMPORAL ORDER OF THE SEQUENCE OF THE TEN
+#ADDRESSES FROM EACH SAMPLE, WHICH ARE THE INPUTS, AND THE OUTPUTS ARE THE PREDICTIONS OF THE
+#TRUE TEMPORAL ORDER OF EACH ONE OF THE PERMUTED SAMPLES.
+
+############################################################################################### 
+###############################################################################################
+
+                    ######### PRE-PROCESSING OF TEXTUAL DATA ########
+//Input: From the SOTU corpus, read all lines (each line being an Address) into an array
+SofUtext = read lines from file=SOTU into an array
+
+// Determine the length of the input text array which is equal the total number of Addresses
+L = length(SofUtext)
+
+// Create a copy of the input text array
+SofU2gramtxt = SofUtext
+
+// Iterate over each element in the array
+for i from 1 to L do
+    // Extract the current text element
+    s = SofU2gramtxt[i]
+    
+    // Split the current text element into words
+    w = split s into words using space as delimiter
+    
+    // Generate n-grams (here, unigrams) from the words
+    ngrams_list = generate n-grams from w with n = 1
+    
+    // Join the n-grams with underscores and update the text element in the array
+    updated_text = join ngrams_list with underscores
+    SofU2gramtxt[i] = updated_text
+end for
+
+// Convert the text data into a Document-Term Matrix
+DocTermMatrix = create Document-Term Matrix from SofU2gramtxt
+
+// Convert the Document-Term Matrix to a matrix format
+SofUVCDocTerm = convert DocTermMatrix to matrix format
+
+// Remove corrupted or non-words from the columns. (We removed the first 1254 columns) 
+SofUVCDocTerm = remove columns 1 to 1254 from SofUVCDocTerm
+
+// Find columns (terms) where the sum of entries is greater than or equal to 2
+indx = find column indices where sum of entries >= 2
+
+// Filter the matrix to keep only the relevant columns
+SofUVCDocTerm = keep columns with indices in indx from SofUVCDocTerm
+
+// Transpose the matrix (swap rows and columns) and assign the transposed matrix to FreqTableSofU
+FreqTableSofU = transpose SofUVCDocTerm
+
+
+##################### SAMPLE 100 TIMES A SEQUENCE OF 10 ADDRESSES, DATED TO BE 23 YEARS APART. ENSURE THAT THERE ARE NO
+#DUPLICATED SAMPLES BY SAMPLING 200 TIMES, THEN REMOVE THE DUPLICATED TERMS, AND THEN SAVE THE FIRST 100 UNDUPLICATED
+#SAMPLES. THE UNIQUE 100 SAMPLES ARE STORED IN MATRIX "SampleMat" #####################
+
+// Set column names of the matrix "FreqTableSofU" to be sequential numbers starting from 1
+through number of columns
+
+// Define constants
+lengthofstring = 10
+numofspeech = number of columns in FreqTableSofU
+
+// Set the number of samples to extract
+numSample = 200
+
+// Initialize a matrix to store sample data with zeros
+SampleMat = create matrix with numSample rows and lengthofstring columns, filled with zeros
+
+// Initialize count variable
+count = 1
+
+// Continue sampling until the count exceeds numSample
+while count <= numSample do
+    // Select an initial sample index randomly from the range 1 to numofspeech
+    initialsample = random integer between 1 and numofspeech
+
+    // Generate a sequence of indices for the sample
+    SampleSofU = create sequence starting at initialsample and incrementing by 23, with length equal to lengthofstring
+    SampleSofU = take modulo numofspeech for each element in the sequence
+
+    // Handle indices where the result is 0
+    indx = find indices in SampleSofU where value is 0
+    if length of indx > 0 then
+        // Set these indices to 240
+        set elements in SampleSofU at indx to 240
+
+    // Sort the sample indices
+    SampleSofU = sort SampleSofU
+
+    // Store the sorted sample into the matrix SampleMat
+    SampleMat[count, ] = SampleSofU
+    
+    // Increment the count
+    count = count + 1
+end while
+
+// Set the number of unique samples to keep
+numSampleNow = 100
+
+// Ensure SampleMat contains only unique rows and keep only the first numSampleNow rows
+SampleMat = get unique rows from SampleMat
+SampleMat = keep the first numSampleNow rows of the unique rows of SampleMat
+
+                                              ####### MAIN FUNCTION #######
+######################  WITHIN EACH FOR LOOP:  EACH ROW OF THE SAMPLE MATRIX "SampleMat" CONSISTS OF A SET OF 10 RANDOM ADDRESSES SEQUENTIALLY ORDERED 23 YEARS APART. IN THE MATRIX "FreqMatrixFinal", THE COLUMNS ARE THE TEMPORALLY ORDERED SAMPLED ADDRESSES, AND THE ROWS ARE THE WORDS WHICH HAVE OCCURRED AT LEAST TWICE ACROSS THE SAMPLED ADDRESSES. THE ELEMENTS OF THE MATRIX ARE THE COUNTS OF WORDS (ROWS) IN THE ADDRESSES (COLUMNS). "Sint" IS A RANDOM PERMUTATION OF THE COLUMNS OF "FreqMatrixFinal". THE INPUT FOR THE SIMULATED ANNEALING ALGORITHM IS THE MATRIX "FreqMatrixFinal" ALONG WITH THE RANDOM COLUMN PERMUTATION "Sint". THE OUTPUT IN THE ROW OF THE MATRIX "SestHopt" IS THE PREDICTED ORDER OF THE 10 ADDRESSES AFTER THE PERMUTATION "Sint". ######################
+
+
+// Create a matrix to store results with numSampleNow rows and lengthofstring + 1 columns
+SestHopt = create matrix with numSampleNow rows and (lengthofstring + 1) columns, filled with zeros
+
+// Loop through each sample
+for i from 1 to numSampleNow do
+    // Extract the i^th row from SampleMat
+    S = SampleMat[i, ]
+
+    // Extract relevant columns from FreqTableSofU based on indices S
+    FreqMatrixTemp = extract columns from FreqTableSofU using S
+
+    // Find rows in FreqMatrixTemp where the sum of values is at least 2
+    IndxRow = find row indices where sum of values >= 2
+
+    // Filter the matrix to keep only the relevant rows
+    FreqMatrixFinal = keep rows in FreqMatrixTemp at IndxRow
+
+    // Get the number of elements in S
+    M = length of S
+
+    // Randomly permute the sequential order of S
+    Sint = A string of random permutation of the integers between 1 and M
+
+
+    // Apply SimAnnealHopt function to the filtered frequency matrix and the sampled index
+    SestHopt[i, ] = result of SimAnnealHopt(FreqMatrixFinal, Sint)
+
+    // Prepare the output vector including the index and results
+    x = concatenate i with SestHopt[i, ]
+
+    // Write the output to a file with specified format. 
+    // The first column is the index. The second column is the bandwith associated with the predicted temporal order 
+    //(Section 5.1, equation (4)). 
+    // The remaining 10 columns are the estimated order of the true temporal (the correct order is 1 to M sequentially, M=10)
+    
+    write x to file ="SestHopt.txt", with 12 columns, in append mode
+end for
+
+
+
+########### SUB-FUNCTION: COMPUTES THE ELEMENTS REQUIRED TO COMPUTE BANDWIDTH (EQUATION 11 AND EQUATION 12 IN APPENDIX B) ###########
+
+Function HoptInputFun():
+    // Define degrees of freedom for the t-distribution
+    nu <- 5
+    
+    // Generate 10000 random variables from a t-distribution with 'nu' degrees of freedom
+    xrand <- GenerateRandomTDistribution(10000, nu)
+    
+    // Compute the density of the t-distribution at the generated random variables
+    densities <- ComputeDensity(xrand, nu)
+    
+    // Calculate the mean of the densities (this is the last component of equation 11 in Appendix B (\int K^2(z)dz)).
+    IntgKsqrd <- Mean(densities)
+    
+    // Calculate the second moment squared for the t-distribution 
+    //(this is the first component of equation 12 in Appendix B ( (\int z^2K(z)dz)^2 ) )
+    secMomentSqr <- (nu / (nu - 2))^2
+    
+    // Return the results as a list or array
+    Return [IntgKsqrd, secMomentSqr]
+    
+############# SUB-FUNCTION: COMPUTING THE MEDIAN AVERAGE BANDWIDTH VALUE ACROSS WORDS (SECTION 5.1, EQUATION 3) #############
+     
+function HoptFun(FreqMatrixFinal, Sint) 
+    // Get the necessary input values for the function
+    hoptInput = call HoptInputFun()
+    IntgKsqrd = hoptInput[1]
+    secMomentSqr = hoptInput[2]
+
+    // Initialize variables
+    d1 = number of rows in FreqMatrixFinal
+    hoptArray = create an array of length d1 filled with zeros
+    x = create a sequence from 1 to length of Sint
+    N = compute column sums of FreqMatrixFinal for columns specified by Sint
+    M= length of Sint   
+    
+    // Loop through each row of FreqMatrixFinal
+    for i from 1 to d1 do
+        // Compute x squared
+        x2 = x squared
+
+        // Create matrix of trials with observed counts of success and faliure 
+        Trials = combine FreqMatrixFinal[i, Sint] with (N - FreqMatrixFinal[i, Sint])
+
+        // Fit a logistic regression model to the trials data
+        model = fit a generalized linear model with Trials ~ x + x2 using binomial(link="logit")
+
+        // Calculate the second derivative of the log-likelihood function
+        nu2ndderivArray = 2 * model$coefficients[3]
+
+        // Compute the squared second derivative
+        Expnu2ndderivArray = nu2ndderivArray squared
+
+        // Calculate the inverse variance
+        invVar = sum of (model$fitted values * (1 - model$fitted values))^-1
+
+        // Compute hopt using the formula
+        hopt = (IntgKsqrd * invVar / (secMomentSqr * Expnu2ndderivArray * M))^(1/5) 
+
+        // Store the result in the array
+        hoptArray[i] = hopt
+    end for
+
+    // Return the median of the hoptArray 
+    return median of hoptArray
+end function
+
+
+
+########## SUB-FUNCTION: CREATE A NEIGHBOURHOOD FROM THE CURRENT INPUT SEQUENCE BY REVERSING AND/OR MOVING A SUBSEQUENCE OF TERMS (SECTION 5.2) #############
+
+
+function CreateneighbourSolNew(S) 
+    // Get the length of the input sequence
+    M = length of S
+
+    // Randomly select an anchor index and define the subsequence to be moved
+    anchorIndx = random integer between 1 and (M - 3)
+    indextake = sequence from anchorIndx to (anchorIndx + 3)
+
+    // Randomly select an index where the subsequence will be placed
+    dropIndx = random integer between 1 and (M - 3)
+    indexput = sequence from dropIndx to (dropIndx + 3)
+
+    // Create a new sequence to be modified
+    SNew = create a numeric array of length M initialized to zeros
+
+    // Place the subsequence into the new position
+    SNew[indexput] = S[indextake]
+
+    // Copy the remaining elements
+    SNew[-indexput] = S[-indextake]
+
+    // Randomly decide whether to reverse the order of the moved subsequence
+    flip = random integer from the set {0, 1}
+    if flip equals 1 then
+        // Reverse the order of the subsequence in the new sequence
+        LenI = length of indexput
+        SNew[indexput] = SNew[indexput reversed]
+
+    // Return the modified sequence
+    return SNew
+end function
+
+
+
+########## SUB-FUNCTION: ANNEALING SCHEDULE ##########
+ 
+function CalculateTemp(Constant, i)
+    // Calculate the temperature based on the given constant and index
+    Temp = Constant raised to the power of (-i)
+    
+    // Return the calculated temperature
+    return Temp
+end function
+
+
+########## SUB-FUNCTION: A CALL FROM THE SUB-FUNCTION "SIMULATED ANNEALING" ##########
+ 
+function EntropySeqHopt(FreqMatrixFinal, S)
+    // Call HoptFun with FreqMatrixFinal and S and negate the result. 
+    hopt = - call HoptFun(FreqMatrixFinal, S)
+    
+    // Return the computed entropy value
+    return hopt
+end function
+
+
+############### SUB-FUNCTION: SIMULATED ANNEALING ALGORITHM. WHEN SEEN IN CONJUCTION WITH THE SUB-FUNCTION "EntropySeqHopt", THIS ALGORITHM FINDS A PERMUTAION SOLUTION THAT MAXIMIZES THE MEDIAN AVERAGE BANDWIDTH VALUE ACROSS WORDS (SECTION 5.1, EQUATION 4). ######################
+
+function SimAnnealHopt(FreqMatrixFinal, Sint)
+    // Initialize parameters
+    Constant = 1.011
+    Scurrent = Sint
+    Sbest = Scurrent
+    i = 1
+
+    // Iterate to perform simulated annealing
+    while i <= 150 do
+        i = i + 0.5
+
+        // Generate a new neighboring solution
+        Si = call CreateneighbourSolNew(Scurrent)
+
+        // Calculate current temperature
+        tempcurrent = call CalculateTemp(Constant, i)
+
+        // Compute entropy for current and new solutions
+        EntropySeqSi = call EntropySeqHopt(FreqMatrixFinal, Si)
+        EntropySeqScurrent = call EntropySeqHopt(FreqMatrixFinal, Scurrent)
+        
+        // Calculate the change in entropy
+        deltaEntropy = EntropySeqSi - EntropySeqScurrent
+
+        // Evaluate if the new solution is better
+        if deltaEntropy < 0 then
+            Scurrent = Si
+            // Update the best solution if the new one is better
+            if EntropySeqSi <= call EntropySeqHopt(FreqMatrixFinal, Sbest) then
+                Sbest = Si
+            end if
+        else
+            // Accept the new solution with a certain probability
+            if exp(-deltaEntropy / tempcurrent) > random value between 0 and 1 then
+                Scurrent = Si
+                // Print details if the new solution is accepted
+                print exp(-deltaEntropy / tempcurrent) 
+                print tempcurrent
+            end if
+        end if
+    end while
+
+    // Compute the optimal bandwith value for the best ordering solution
+    h = - call EntropySeqHopt(FreqMatrixFinal, Sbest)
+
+    // Return the result as a vector
+    return vector containing h and Sbest
+end function
